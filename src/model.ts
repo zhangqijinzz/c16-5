@@ -1,3 +1,5 @@
+import type { PracticeState } from './practice';
+
 export type GuideKey = 'thirds' | 'center' | 'diagonal' | 'golden';
 export type Phase = 'loading' | 'ready' | 'editing' | 'error';
 export type Ratio = 'free' | '1:1' | '4:5' | '16:9';
@@ -30,6 +32,7 @@ export interface FrameDocument {
 export interface ViewState {
   phase: Phase;
   document: FrameDocument;
+  practice: PracticeState;
   compareOpen: boolean;
   notice: string;
   error: string | null;

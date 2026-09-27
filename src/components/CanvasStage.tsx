@@ -1,17 +1,19 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import type { CropVariant, GuideKey, ImageAsset } from '../model';
+import type { TargetHint } from '../practice';
 
 interface CanvasStageProps {
   image: ImageAsset;
   guides: Record<GuideKey, boolean>;
   crop: CropVariant;
   subject: { x: number; y: number } | null;
+  targets?: TargetHint[];
   onSubject: (x: number, y: number) => void;
   onMoveCrop: (dx: number, dy: number) => void;
   onResizeCrop: (width: number, height: number) => void;
 }
 
-export function CanvasStage({ image, guides, crop, subject, onSubject, onMoveCrop, onResizeCrop }: CanvasStageProps) {
+export function CanvasStage({ image, guides, crop, subject, targets = [], onSubject, onMoveCrop, onResizeCrop }: CanvasStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ mode: 'move' | 'resize'; x: number; y: number; crop: CropVariant } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -59,6 +61,9 @@ export function CanvasStage({ image, guides, crop, subject, onSubject, onMoveCro
         {guides.diagonal && <div className="guide diagonal-guide"><i /><i /></div>}
         {guides.golden && <div className="guide golden-guide"><i /><i /></div>}
         {subject && <div className="subject-pin" style={{ left: `${subject.x * 100}%`, top: `${subject.y * 100}%` }}><span>主体</span></div>}
+        {targets.map((target, index) => (
+          <div key={`${target.kind}-${index}`} className={`exercise-target ${target.kind}`} style={{ left: `${target.x * 100}%`, top: `${target.y * 100}%` }} aria-hidden="true"><i /><b /></div>
+        ))}
         <div className={`crop-frame ${dragging ? 'dragging' : ''}`} style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }} onPointerDown={(event) => startDrag(event, 'move')} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
           <div className="crop-label">{crop.ratio === 'free' ? '自由裁切' : crop.ratio}</div>
           <button className="resize-handle" aria-label="调整裁切大小" onPointerDown={(event) => startDrag(event, 'resize')} onClick={(event) => event.stopPropagation()} />
