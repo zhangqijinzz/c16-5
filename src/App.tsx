@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
 import { CanvasStage } from './components/CanvasStage';
 import { EmptyState } from './components/EmptyState';
+import { PracticePanel } from './components/PracticePanel';
 import { Toolbar } from './components/Toolbar';
 import { VariantList } from './components/VariantList';
-import { LocalFrameRepository } from './repository';
-import { BrowserImageService, BrowserStorageService } from './service';
+import { LocalFrameRepository, LocalPracticeRepository } from './repository';
+import { BrowserImageService, BrowserStorageService, PRACTICE_STORAGE_KEY, STORAGE_KEY } from './service';
 import type { CropVariant, ImageAsset, Ratio } from './model';
 import { useFrameSenseViewModel } from './viewModel';
 
-const repository = new LocalFrameRepository(new BrowserStorageService());
+const repository = new LocalFrameRepository(new BrowserStorageService(STORAGE_KEY));
+const practiceRepository = new LocalPracticeRepository(new BrowserStorageService(PRACTICE_STORAGE_KEY));
 const imageService = new BrowserImageService();
 
 export default function App() {
-  const [viewModel, state] = useFrameSenseViewModel(repository, imageService);
+  const [viewModel, state] = useFrameSenseViewModel(repository, imageService, practiceRepository);
   const [showInfo, setShowInfo] = useState(false);
   useEffect(() => { void viewModel.initialize(); }, [viewModel]);
   const { document } = state;
@@ -29,6 +31,7 @@ export default function App() {
         <Toolbar guides={document.guides} ratio={document.crop.ratio} onImport={handleImport} onDemo={() => viewModel.loadDemo()} onToggleGuide={(guide) => viewModel.toggleGuide(guide)} onRatio={(ratio: Ratio) => viewModel.setRatio(ratio)} onCompare={() => viewModel.toggleCompare()} compareOpen={state.compareOpen} />
         <section className="work-area">
           <div className="work-heading"><div><p className="eyebrow">WORKSPACE / {document.image ? 'EDITING' : 'READY'}</p><h1>{document.image ? document.image.name : '构图工作台'}</h1></div><div className="notice" role="status">{state.error ?? state.notice}</div></div>
+          {!state.compareOpen && <PracticePanel practice={state.practice} hasImage={document.image !== null} onStart={(id) => viewModel.startExercise(id)} onExit={() => viewModel.exitPractice()} onAdvance={() => viewModel.advanceExercise()} />}
           {!document.image ? <EmptyState onDemo={() => viewModel.loadDemo()} /> : state.compareOpen ? <Comparison image={document.image} variants={document.variants} /> : <CanvasStage image={document.image} guides={document.guides} crop={document.crop} subject={document.subject} onSubject={(x, y) => viewModel.markSubject(x, y)} onMoveCrop={(dx, dy) => viewModel.moveCrop(dx, dy)} onResizeCrop={(width, height) => viewModel.resizeCrop(width, height)} />}
           {document.image && !state.compareOpen && <div className="editor-footer"><span><b>当前比例</b> {document.crop.ratio === 'free' ? '自由裁切' : document.crop.ratio}</span><span><b>辅助层</b> {Object.values(document.guides).filter(Boolean).length} 个开启</span><span><b>主体</b> {document.subject ? '已标记' : '点击画面添加'}</span></div>}
         </section>

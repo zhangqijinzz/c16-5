@@ -10,7 +10,7 @@ export function EmptyState({ onDemo }: EmptyStateProps) {
       <h2>先把一张照片放进画框</h2>
       <p>叠加构图辅助线，找到主体的视觉重心，再保存不同裁切版本。</p>
       <button className="primary-button" onClick={onDemo}>载入示例图片</button>
-      <span className="empty-hint">也可以从左上角导入本地图片</span>
+      <span className="empty-hint">也可以从左上角导入本地图片；不知道从何下手时，点上方「构图练习」的开始，会一步步带你练。</span>
     </section>
   );
 }

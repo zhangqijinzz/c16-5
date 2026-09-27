@@ -1,16 +1,28 @@
 import { useState, useSyncExternalStore } from 'react';
 import { cropForRatio, makeVariant, moveCrop, resizeCrop } from './domain';
-import { EMPTY_DOCUMENT, type FrameDocument, type GuideKey, type Ratio, type ViewState } from './model';
-import type { FrameRepository } from './repository';
+import { EXERCISES, getExercise, nextExerciseId } from './exercises';
+import { EMPTY_DOCUMENT, EMPTY_PRACTICE, type FrameDocument, type GuideKey, type PracticeRecord, type Ratio, type ViewState } from './model';
+import type { FrameRepository, PracticeRepository } from './repository';
 import type { ImageService } from './service';
 
 type Listener = () => void;
 
 export class FrameSenseViewModel {
-  private state: ViewState = { phase: 'loading', document: structuredClone(EMPTY_DOCUMENT), compareOpen: false, notice: '', error: null };
+  private state: ViewState = {
+    phase: 'loading',
+    document: structuredClone(EMPTY_DOCUMENT),
+    compareOpen: false,
+    notice: '',
+    error: null,
+    practice: structuredClone(EMPTY_PRACTICE),
+  };
   private readonly listeners = new Set<Listener>();
 
-  constructor(private readonly repository: FrameRepository, private readonly imageService: ImageService) {}
+  constructor(
+    private readonly repository: FrameRepository,
+    private readonly imageService: ImageService,
+    private readonly practiceRepository: PracticeRepository,
+  ) {}
 
   getSnapshot = (): ViewState => this.state;
 
@@ -31,15 +43,48 @@ export class FrameSenseViewModel {
     } catch {
       this.patch({ phase: 'error', error: '本地保存失败，但当前编辑仍保留在页面中。请检查浏览器存储权限。' });
     }
+    this.evaluatePractice();
+  }
+
+  private evaluatePractice(): void {
+    const practice = this.state.practice;
+    if (!practice.activeId) return;
+    const exercise = getExercise(practice.activeId);
+    if (!exercise) return;
+    const feedback = exercise.evaluate(this.state.document);
+    let records = practice.records;
+    let notice: string | null = null;
+    if (feedback.status === 'done' && !records.some((record) => record.exerciseId === exercise.id)) {
+      const nextRecords = [...records, { exerciseId: exercise.id, completedAt: new Date().toISOString() }];
+      try {
+        this.practiceRepository.save(nextRecords);
+        records = nextRecords;
+        notice = `练习完成：${exercise.title}。完成记录已保存。`;
+      } catch {
+        this.patch({ error: '练习记录保存失败，本次完成进度可能无法保留。' });
+      }
+    }
+    this.patch({ practice: { ...this.state.practice, records, feedback }, ...(notice ? { notice } : {}) });
   }
 
   async initialize(): Promise<void> {
     this.patch({ phase: 'loading', notice: '正在恢复上次工作状态…', error: null });
+    let records: PracticeRecord[] = [];
+    try {
+      records = this.practiceRepository.load();
+    } catch {
+      records = [];
+    }
     try {
       const document = this.repository.load();
-      this.patch({ document, phase: document.image ? 'editing' : 'ready', notice: document.image ? '已恢复上次工作状态' : '欢迎来到 FrameSense，先载入示例或导入图片。' });
+      const notice = document.image
+        ? '已恢复上次工作状态'
+        : records.length > 0
+          ? `欢迎回来，已完成 ${records.length}/${EXERCISES.length} 课练习，可随时继续。`
+          : '欢迎来到 FrameSense，先载入示例或导入图片。';
+      this.patch({ document, phase: document.image ? 'editing' : 'ready', notice, practice: { ...this.state.practice, records } });
     } catch {
-      this.patch({ phase: 'error', notice: '未能读取历史状态，可继续新建工作。', error: '本地数据读取失败。' });
+      this.patch({ phase: 'error', notice: '未能读取历史状态，可继续新建工作。', error: '本地数据读取失败。', practice: { ...this.state.practice, records } });
     }
   }
 
@@ -98,10 +143,48 @@ export class FrameSenseViewModel {
   toggleCompare(): void {
     this.patch({ compareOpen: !this.state.compareOpen });
   }
+
+  startExercise(id: string): void {
+    const exercise = getExercise(id);
+    if (!exercise) return;
+    let document = this.state.document;
+    if (!document.image) document = { ...structuredClone(EMPTY_DOCUMENT), image: this.imageService.demo() };
+    if (exercise.guide && !document.guides[exercise.guide]) {
+      document = { ...document, guides: { ...document.guides, [exercise.guide]: true } };
+    }
+    this.patch({ compareOpen: false, practice: { ...this.state.practice, activeId: id, feedback: null } });
+    this.persist(document, `练习开始：${exercise.title}。${exercise.tip}`);
+  }
+
+  exitPractice(): void {
+    if (!this.state.practice.activeId) return;
+    this.patch({
+      practice: { ...this.state.practice, activeId: null, feedback: null },
+      notice: '已退出练习，当前图片与裁切方案保持不变，可继续自由编辑。',
+    });
+  }
+
+  advanceExercise(): void {
+    const next = nextExerciseId(this.state.practice.activeId);
+    if (next) {
+      this.startExercise(next);
+      return;
+    }
+    if (!this.state.practice.activeId) return;
+    const allDone = EXERCISES.every((exercise) => this.state.practice.records.some((record) => record.exerciseId === exercise.id));
+    this.patch({
+      practice: { ...this.state.practice, activeId: null, feedback: null },
+      notice: allDone ? '全部练习完成！当前画面保留，可继续自由创作。' : '已跳过最后一课，随时可以从练习面板继续。',
+    });
+  }
 }
 
-export function useFrameSenseViewModel(repository: FrameRepository, imageService: ImageService): [FrameSenseViewModel, ViewState] {
-  const [viewModel] = useState(() => new FrameSenseViewModel(repository, imageService));
+export function useFrameSenseViewModel(
+  repository: FrameRepository,
+  imageService: ImageService,
+  practiceRepository: PracticeRepository,
+): [FrameSenseViewModel, ViewState] {
+  const [viewModel] = useState(() => new FrameSenseViewModel(repository, imageService, practiceRepository));
   const state = useSyncExternalStore(viewModel.subscribe, viewModel.getSnapshot, viewModel.getSnapshot);
   return [viewModel, state];
 }

@@ -27,12 +27,36 @@ export interface FrameDocument {
   variants: CropVariant[];
 }
 
+export type ExerciseStatus = 'done' | 'close' | 'far';
+
+export interface ExerciseFeedback {
+  status: ExerciseStatus;
+  message: string;
+}
+
+export interface PracticeRecord {
+  exerciseId: string;
+  completedAt: string;
+}
+
+export interface PracticeLog {
+  version: 1;
+  records: PracticeRecord[];
+}
+
+export interface PracticeState {
+  activeId: string | null;
+  records: PracticeRecord[];
+  feedback: ExerciseFeedback | null;
+}
+
 export interface ViewState {
   phase: Phase;
   document: FrameDocument;
   compareOpen: boolean;
   notice: string;
   error: string | null;
+  practice: PracticeState;
 }
 
 export const DEFAULT_CROP: CropVariant = {
@@ -51,4 +75,10 @@ export const EMPTY_DOCUMENT: FrameDocument = {
   subject: null,
   crop: DEFAULT_CROP,
   variants: [],
+};
+
+export const EMPTY_PRACTICE: PracticeState = {
+  activeId: null,
+  records: [],
+  feedback: null,
 };

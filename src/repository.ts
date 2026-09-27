@@ -1,5 +1,5 @@
-import { isFrameDocument } from './domain';
-import { EMPTY_DOCUMENT, type FrameDocument } from './model';
+import { isFrameDocument, isPracticeLog } from './domain';
+import { EMPTY_DOCUMENT, type FrameDocument, type PracticeLog, type PracticeRecord } from './model';
 import type { StorageService } from './service';
 
 export interface FrameRepository {
@@ -23,5 +23,30 @@ export class LocalFrameRepository implements FrameRepository {
 
   save(document: FrameDocument): void {
     this.storage.write(JSON.stringify(document));
+  }
+}
+
+export interface PracticeRepository {
+  load(): PracticeRecord[];
+  save(records: PracticeRecord[]): void;
+}
+
+export class LocalPracticeRepository implements PracticeRepository {
+  constructor(private readonly storage: StorageService) {}
+
+  load(): PracticeRecord[] {
+    const raw = this.storage.read();
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return isPracticeLog(parsed) ? parsed.records : [];
+    } catch {
+      return [];
+    }
+  }
+
+  save(records: PracticeRecord[]): void {
+    const log: PracticeLog = { version: 1, records };
+    this.storage.write(JSON.stringify(log));
   }
 }

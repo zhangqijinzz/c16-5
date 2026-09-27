@@ -1,6 +1,7 @@
 import type { ImageAsset } from './model';
 
 export const STORAGE_KEY = 'framesense.document.v1';
+export const PRACTICE_STORAGE_KEY = 'framesense.practice.v1';
 
 export interface StorageService {
   read(): string | null;
@@ -8,12 +9,14 @@ export interface StorageService {
 }
 
 export class BrowserStorageService implements StorageService {
+  constructor(private readonly key: string = STORAGE_KEY) {}
+
   read(): string | null {
-    return window.localStorage.getItem(STORAGE_KEY);
+    return window.localStorage.getItem(this.key);
   }
 
   write(value: string): void {
-    window.localStorage.setItem(STORAGE_KEY, value);
+    window.localStorage.setItem(this.key, value);
   }
 }
 

@@ -1,4 +1,4 @@
-import type { CropVariant, FrameDocument, Ratio } from './model';
+import type { CropVariant, FrameDocument, PracticeLog, PracticeRecord, Ratio } from './model';
 
 const clamp = (value: number, min = 0, max = 1): number => Math.min(max, Math.max(min, value));
 
@@ -54,4 +54,20 @@ export function isFrameDocument(value: unknown): value is FrameDocument {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<FrameDocument>;
   return candidate.version === 1 && typeof candidate.guides === 'object' && candidate.crop !== undefined && Array.isArray(candidate.variants);
+}
+
+export function isPracticeLog(value: unknown): value is PracticeLog {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<PracticeLog>;
+  return (
+    candidate.version === 1 &&
+    Array.isArray(candidate.records) &&
+    candidate.records.every(
+      (record) =>
+        record !== null &&
+        typeof record === 'object' &&
+        typeof (record as PracticeRecord).exerciseId === 'string' &&
+        typeof (record as PracticeRecord).completedAt === 'string',
+    )
+  );
 }
